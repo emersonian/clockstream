@@ -1,10 +1,14 @@
 package main
 
 import (
+	"fmt"
+	"github.com/dchest/uniuri"
 	"github.com/murlokswarm/app"
 	"github.com/murlokswarm/app/drivers/mac"
 	// "firebase.google.com/go/messaging"
 )
+
+var LocationName string
 
 type Menu struct {
 	Connected bool
@@ -23,9 +27,11 @@ func (m *Menu) Render() string {
 {{else}}
 	<menuitem label="Disconnected from ProPresenter" disabled></menuitem>
 	<menuitem separator></menuitem>
-	<menuitem label="Setup Instructions" onclick="OnOpenWindow"></menuitem>
+	<menuitem label="Setup Instructions" onclick="OpenSetup"></menuitem>
 	<menuitem separator></menuitem>
 {{end}}
+	<menuitem separator></menuitem>
+	<menuitem label="Set location name..." onclick="OpenSettings"></menuitem>
 	<menuitem separator></menuitem>
 	<menuitem label="{{.Version}}" disabled></menuitem>
 	<menuitem separator></menuitem>
@@ -43,7 +49,7 @@ func (m *Menu) OnConnectEvent(connected bool) {
 	app.Render(m)
 }
 
-func (m *Menu) OnOpenWindow() {
+func (m *Menu) OpenSetup() {
 	app.NewWindow(app.WindowConfig{
 		Width:          450,
 		Height:         250,
@@ -53,6 +59,28 @@ func (m *Menu) OnOpenWindow() {
 		FixedSize:      true,
 		URL:            "help",
 	})
+}
+
+var SettingsWindow app.Window
+var SettingsIsOpen bool
+
+func (m *Menu) OpenSettings() {
+	if SettingsIsOpen == false {
+		SettingsIsOpen = true
+		SettingsWindow = app.NewWindow(app.WindowConfig{
+			Width:          450,
+			Height:         250,
+			X:              400,
+			Y:              600,
+			TitlebarHidden: true,
+			FixedSize:      true,
+			URL:            "settings",
+			OnClose: func() bool {
+				SettingsIsOpen = false
+				return true
+			},
+		})
+	}
 }
 
 type MenuClocks struct {
@@ -102,12 +130,54 @@ func (h *Help) Render() string {
 	`
 }
 
+type Settings struct {
+	Location            string
+	LocationInitialized bool
+}
+
+func (h *Settings) Render() string {
+	if h.LocationInitialized == false {
+		h.Location = LocationName
+		h.LocationInitialized = true
+		// TODO: How to initialize values? app.Import(&Settings{Location: LocationName})
+	}
+	return `
+<div class="Help" style="color:#ddd; padding:30px;">
+	<h3>Clockstream Settings</h3>
+	<p>
+		Location Name<br>
+		<small>(alphanumeric, no spaces. Example: &quot;usa-east-nyc&quot;)</small>
+	</p>
+	<p>
+		<input value="{{.Location}}" placeholder="usa-east-(your-name)..." onchange="Location" autofocus style="font-size: 14pt; padding: 5px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+	</p>
+	<p>
+
+		<input type="submit" value="Update" style="font-size: 14pt; padding: 5px;" autocomplete="off" onclick="OnUpdate">
+	</p>
+</div>
+	`
+}
+
+func (h *Settings) OnUpdate() {
+	LocationName = h.Location
+	app.Log(h.Location)
+	app.Log("Updated LocationName: ", LocationName)
+	SettingsWindow.Close()
+}
+
 func main() {
 	app.EnableDebug(true)
+
+	if LocationName == "" {
+		LocationName = fmt.Sprintf("unknown-%s", uniuri.NewLenChars(5, []byte("abcdefghijklmnopqrstuvwxyz0123456789")))
+		app.Log(LocationName)
+	}
 
 	app.Import(&Menu{})
 	app.Import(&MenuClocks{})
 	app.Import(&Help{})
+	app.Import(&Settings{})
 
 	app.HandleAction("connect-action", func(e app.EventDispatcher, a app.Action) {
 		e.Dispatch("connect-event", a.Arg)
@@ -115,6 +185,7 @@ func main() {
 	app.HandleAction("clock-action", func(e app.EventDispatcher, a app.Action) {
 		e.Dispatch("clock-event", a.Arg)
 	})
+	app.Log(LocationName)
 
 	app.Run(&mac.Driver{
 		Bundle: mac.Bundle{
