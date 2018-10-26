@@ -23,7 +23,8 @@ func (m *Menu) Render() string {
 {{else}}
 	<menuitem label="Disconnected from ProPresenter" disabled></menuitem>
 	<menuitem separator></menuitem>
-	<instructions>
+	<menuitem label="Setup Instructions" onclick="OnOpenWindow"></menuitem>
+	<menuitem separator></menuitem>
 {{end}}
 	<menuitem separator></menuitem>
 	<menuitem label="{{.Version}}" disabled></menuitem>
@@ -40,6 +41,17 @@ func (m *Menu) Subscribe() *app.EventSubscriber {
 func (m *Menu) OnConnectEvent(connected bool) {
 	m.Connected = connected
 	app.Render(m)
+}
+
+func (m *Menu) OnOpenWindow() {
+	app.NewWindow(app.WindowConfig{
+		Width:          450,
+		Height:         250,
+		X: 400,
+		Y: 600,
+		TitlebarHidden: true,
+		URL: "help",
+	})
 }
 
 type MenuClocks struct {
@@ -62,26 +74,40 @@ func (m *MenuClocks) OnClockChange(clocks map[string]string) {
 	app.Render(m)
 }
 
-type Instructions struct {
+type Help struct {
 	Password string
 	Port string
 }
-func (m *Instructions) Render() string {
-	m.Password = WS_PASSWORD
-	m.Port = WS_PORT
+
+func (h *Help) Render() string {
+	h.Password = WS_PASSWORD
+	h.Port = WS_PORT
 	return `
-	<menuitem label="Setup: Open ProPresenter, go to Preferences, enable Network," disabled></menuitem>
-	<menuitem label="set the Network Port to {{.Port}}. Enable Stage Display App, set" disabled></menuitem>
-	<menuitem label="the password to {{.Password}} and ensure stage port is empty, restart PP." disabled></menuitem>
-`
+<div class="Help" style="color:#ddd; padding:30px;">
+	<h3>Clockstream Setup Instructions</h3>
+	<p>
+		Open ProPresenter, go to Preferences, enable Network, set the Network
+		Port to {{.Port}}.
+	</p>
+	<p>
+		Enable Stage Display App, set the password to {{.Password}}
+		and ensure stage port is empty, restart ProPresenter.
+	</p>
+	<p>
+		You should see clocks when you click on clockstream's menu icon.
+		Restart clockstream if it is still not working.
+	</p>
+</div>
+	`
 }
+
 
 func main() {
 	app.EnableDebug(true)
 
 	app.Import(&Menu{})
 	app.Import(&MenuClocks{})
-	app.Import(&Instructions{})
+	app.Import(&Help{})
 
 	app.HandleAction("connect-action", func(e app.EventDispatcher, a app.Action) {
 		e.Dispatch("connect-event", a.Arg)
