@@ -28,10 +28,14 @@ func HandleMessage(str string) {
 	}
 	if message.Acn == "tmr" {
 		clocks[message.Uid] = message.Txt
-		// app.Log("Clocks: %+v\n", clocks)
-		// app.Log("Clock: ", message.Txt, " - ", message.Uid)
 		app.PostAction("clock-action", clocks)
 	}
+	PushToFirebase(LocationClock{
+		// InstallUuid: nil,
+		Location:  LocationName,
+		ClockUuid: message.Uid,
+		Value:     message.Txt,
+	})
 }
 
 var closeSocket chan bool
@@ -113,11 +117,11 @@ func ConnectionWatchdog() {
 					ProPresenterConnected = false
 					app.Log("Watchdog: Ping timeout, marked as disconnected.")
 				}
-				// if
-				// app.PostAction("connect-action", false)
 			} else {
-				app.Log("Watchdog: spawning connection attempt")
-				ConnectProPresenter()
+				if ProPresenterConnecting == false {
+					app.Log("Watchdog: spawning connection attempt")
+					ConnectProPresenter()
+				}
 			}
 		}
 	}()

@@ -5,7 +5,6 @@ import (
 	"github.com/dchest/uniuri"
 	"github.com/murlokswarm/app"
 	"github.com/murlokswarm/app/drivers/mac"
-	// "firebase.google.com/go/messaging"
 )
 
 var LocationName string
