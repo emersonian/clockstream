@@ -1,10 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/dchest/uniuri"
+	"github.com/mitchellh/go-homedir"
 	"github.com/murlokswarm/app"
 	"github.com/murlokswarm/app/drivers/mac"
+	"io/ioutil"
+	"os"
 )
 
 var LocationName string
@@ -160,18 +164,60 @@ func (h *Settings) Render() string {
 
 func (h *Settings) OnUpdate() {
 	LocationName = h.Location
-	app.Log(h.Location)
+	WriteConfig()
 	app.Log("Updated LocationName: ", LocationName)
 	SettingsWindow.Close()
+}
+
+type Config struct {
+	LocationName string `json:"location_name"`
+}
+
+const CONFIG_PATH = "/.clockstream"
+
+func ConfigPath() string {
+	str, _ := homedir.Expand(fmt.Sprintf("~/%s", CONFIG_PATH))
+	return str
+}
+
+func LoadOrCreateConfig() {
+	var config Config
+	// Read the config. If location_name is empty or not exists, overwrite the file.
+	configFile, err := os.Open(ConfigPath())
+	defer configFile.Close()
+	if err != nil {
+		fmt.Println(err.Error())
+		fmt.Println("Writing default config file.")
+		WriteDefaultConfig()
+	}
+	jsonParser := json.NewDecoder(configFile)
+	jsonParser.Decode(&config)
+	LocationName = config.LocationName
+	if LocationName == "" {
+		WriteDefaultConfig()
+	}
+}
+
+func WriteDefaultConfig() {
+	generatedLocation := fmt.Sprintf("unknown-%s", uniuri.NewLenChars(5, []byte("abcdefghijklmnopqrstuvwxyz0123456789")))
+	LocationName = generatedLocation
+	WriteConfig()
+}
+
+func WriteConfig() {
+	defaultConfig := []byte(fmt.Sprintf(`{"location_name":"%s"}`, LocationName))
+	err := ioutil.WriteFile(ConfigPath(), defaultConfig, 0644)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 }
 
 func main() {
 	app.EnableDebug(true)
 
-	if LocationName == "" {
-		LocationName = fmt.Sprintf("unknown-%s", uniuri.NewLenChars(5, []byte("abcdefghijklmnopqrstuvwxyz0123456789")))
-		app.Log(LocationName)
-	}
+	LoadOrCreateConfig()
+
+	app.Log("LocationName: ", LocationName)
 
 	app.Import(&Menu{})
 	app.Import(&MenuClocks{})
