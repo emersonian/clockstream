@@ -24,8 +24,9 @@ func HandleMessage(str string) {
 	}
 	if message.Acn == "tmr" {
 		clocks[message.Uid] = message.Txt
-		app.Log("Current clock: ", message.Txt)
-		app.PostAction("refresh-clocks", true)
+		app.Log("Clocks: %+v\n", clocks)
+		// app.Log("Clock: ", message.Txt, " - ", message.Uid)
+		app.PostAction("clock-action", clocks)
 	}
 }
 
