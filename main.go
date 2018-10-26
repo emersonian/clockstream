@@ -50,6 +50,7 @@ func (m *Menu) OnOpenWindow() {
 		X:              400,
 		Y:              600,
 		TitlebarHidden: true,
+		FixedSize:      true,
 		URL:            "help",
 	})
 }
