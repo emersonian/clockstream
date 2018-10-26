@@ -1,6 +1,6 @@
 package main
 
-import (	
+import (
 	"github.com/murlokswarm/app"
 	"github.com/murlokswarm/app/drivers/mac"
 	// "firebase.google.com/go/messaging"
@@ -8,7 +8,7 @@ import (
 
 type Menu struct {
 	Connected bool
-	Version string
+	Version   string
 }
 
 // Render returns the HTML describing the status menu.
@@ -47,10 +47,10 @@ func (m *Menu) OnOpenWindow() {
 	app.NewWindow(app.WindowConfig{
 		Width:          450,
 		Height:         250,
-		X: 400,
-		Y: 600,
+		X:              400,
+		Y:              600,
 		TitlebarHidden: true,
-		URL: "help",
+		URL:            "help",
 	})
 }
 
@@ -76,7 +76,7 @@ func (m *MenuClocks) OnClockChange(clocks map[string]string) {
 
 type Help struct {
 	Password string
-	Port string
+	Port     string
 }
 
 func (h *Help) Render() string {
@@ -100,7 +100,6 @@ func (h *Help) Render() string {
 </div>
 	`
 }
-
 
 func main() {
 	app.EnableDebug(true)
@@ -126,7 +125,7 @@ func main() {
 				Icon: app.Resources("logo.png"),
 				URL:  "/Menu",
 			})
-			ConnectProPresenter()
+			ConnectionWatchdog()
 		},
 	}, app.Logs())
 }
