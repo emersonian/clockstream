@@ -1,3 +1,6 @@
+consts.go
 clocks
 clocks.app
+clockstream
+clockstream.app
 .DS_Store

@@ -1,72 +1,24 @@
 package main
 
-import (
-	"os"
-	"os/signal"
+import (	
 	"github.com/murlokswarm/app"
 	"github.com/murlokswarm/app/drivers/mac"
-	"github.com/sacOO7/gowebsocket"
 	// "firebase.google.com/go/messaging"
 )
 
-const URL = "ws://localhost:63968/stagedisplay"
-
-func ConnectProPresenter(){
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt)
-
-	socket := gowebsocket.New(URL)
-  
-	socket.OnConnectError = func(err error, socket gowebsocket.Socket) {
-		app.Log("ws: Received connect error - ", err)
-	}
-  
-	socket.OnConnected = func(socket gowebsocket.Socket) {
-		app.Log("ws: Connected to server");
-		app.PostAction("connect-action", true)
-		// Log in to ProPresenter
-		socket.SendText(`{"pwd":"h1llcl0cks","ptl":610,"acn":"ath"}`)
-	}
-
-	socket.OnDisconnected = func(err error, socket gowebsocket.Socket) {
-		app.Log("ws: Disconnected from server ")
-		app.PostAction("connect-action", false)
-		return
-	}
-  
-	socket.OnTextMessage = func(message string, socket gowebsocket.Socket) {
-		app.Log("ws: Received message - " + message)
-	}
-  
-  	// TODO: Should receive Ping every 10 seconds. Reconnect if no ping within that.
-	socket.OnPingReceived = func(data string, socket gowebsocket.Socket) {
-		app.Log("ws: Received ping - " + data)
-	}
-  
-    socket.OnPongReceived = func(data string, socket gowebsocket.Socket) {
-		app.Log("ws: Received pong - " + data)
-	}
-  
-	socket.Connect()
-
-  	go func() {
-		for {
-			select {
-			case <-interrupt:
-				app.Log("Interrupt. Closing websocket cleanly.")
-				socket.Close()
-				return
-			}
-		}
-	}()
-}
-
 type Menu struct {
 	Connected bool
+	Clocks map[string]string
+	Password string
+	Port string
+	Version string
 }
 
 // Render returns the HTML describing the status menu.
 func (m *Menu) Render() string {
+	m.Password = WS_PASSWORD
+	m.Port = WS_PORT
+	m.Version = VERSION
 	return `
 <menu>
 	{{if .Connected}}
@@ -75,9 +27,14 @@ func (m *Menu) Render() string {
 	<menuitem label="Disconnected from ProPresenter" disabled></menuitem>
 	{{end}}
 	<menuitem separator></menuitem>
-	<menuitem label="Setup: Open ProPresenter, go to Preferences, Network, click" disabled></menuitem>
-	<menuitem label="Enable Stage Display App. Set the password to h1llcl0cks and set" disabled></menuitem>
-	<menuitem label="the Network Port (at top) to 63968 (leave stage port empty), restart PP." disabled></menuitem>
+	{{range .Clocks}}
+	<menuitem label="Clock: {{.}}"></menuitem>
+	{{end}}
+	<menuitem label="Setup: Open ProPresenter, go to Preferences, enable Network," disabled></menuitem>
+	<menuitem label="set the Network Port to {{.Port}}. Enable Stage Display App, set" disabled></menuitem>
+	<menuitem label="the password to {{.Password}} and ensure stage port is empty, restart PP." disabled></menuitem>
+	<menuitem separator></menuitem>
+	<menuitem label="{{.Version}}" disabled></menuitem>
 	<menuitem separator></menuitem>
 	<menuitem label="Quit" selector="terminate:"></menuitem>
 </menu>
