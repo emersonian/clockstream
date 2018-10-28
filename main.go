@@ -11,21 +11,65 @@ import (
 	"github.com/murlokswarm/app/drivers/mac"
 	"io/ioutil"
 	"os"
+	autostart "github.com/ProtonMail/go-autostart"
 )
 
 var LocationName string
 var InstallUuid string
+var AutostartEnabled bool
+var autostartApp *autostart.App
+
+func CheckAutostart() bool {
+	myPath, _ := os.Executable()
+	autostartApp = &autostart.App{
+		Name: "clockstream",
+		DisplayName: "Stream ProPresenter clocks to hillsonglabs",
+		Exec: []string{myPath},
+	}
+
+	if autostartApp.IsEnabled() {
+		fmt.Println("App is set to start on boot")
+		return true
+		// if err := app.Disable(); err != nil {
+		// 	log.Fatal(err)
+		// }
+	} else {
+		fmt.Println("App is NOT set to start on boot")
+		return false
+		// if err := app.Enable(); err != nil {
+		// 	log.Fatal(err)
+		// }
+	}
+}
+
+func SetAutostart(will_autostart bool) {
+	if will_autostart {
+		if err := autostartApp.Enable(); err != nil {
+			app.Log(err)
+		} else {
+			AutostartEnabled = true
+		}
+	} else {
+		if err := autostartApp.Disable(); err != nil {
+			app.Log(err)
+		} else {
+			AutostartEnabled = false
+		}
+	}
+}
 
 type Menu struct {
 	Connected bool
 	Version   string
 	LocationName   string
+	Autostart bool
 }
 
 // Render returns the HTML describing the status menu.
 func (m *Menu) Render() string {
 	m.Version = VERSION
 	m.LocationName = LocationName
+	m.Autostart = AutostartEnabled
 	return `
 <menu>
 {{if .Connected}}
@@ -41,6 +85,11 @@ func (m *Menu) Render() string {
 	<menuitem separator></menuitem>
 	<menuitem label="Location: {{.LocationName}}" disabled></menuitem>
 	<menuitem label="Change..." onclick="OpenSettings"></menuitem>
+{{if .Autostart}}
+	<menuitem label="Start on boot" onclick="ToggleAutostart" checked=true></menuitem>
+{{else}}
+	<menuitem label="Start on boot" onclick="ToggleAutostart"></menuitem>
+{{end}}
 	<menuitem separator></menuitem>
 	<menuitem label="{{.Version}}" disabled></menuitem>
 	<menuitem separator></menuitem>
@@ -68,6 +117,15 @@ func (m *Menu) OpenSetup() {
 		FixedSize:      true,
 		URL:            "help",
 	})
+}
+
+func (m *Menu) ToggleAutostart() {
+	if AutostartEnabled {
+		SetAutostart(false)
+	} else {
+		SetAutostart(true)
+	}
+	app.Render(m)
 }
 
 var SettingsWindow app.Window
@@ -242,8 +300,8 @@ func WriteConfig() {
 
 func main() {
 	// app.EnableDebug(true)
-
 	LoadOrCreateConfig()
+	AutostartEnabled = CheckAutostart()
 	
 	if InstallUuid == "" {
 		// Upgrade v0.1 configs to v0.2
