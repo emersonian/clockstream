@@ -2,16 +2,17 @@ package main
 
 import (
 	"encoding/json"
-	"regexp"
-	"strings"
 	"fmt"
+	autostart "github.com/ProtonMail/go-autostart"
 	"github.com/dchest/uniuri"
 	"github.com/mitchellh/go-homedir"
 	"github.com/murlokswarm/app"
 	"github.com/murlokswarm/app/drivers/mac"
+	"github.com/skratchdot/open-golang/open"
 	"io/ioutil"
 	"os"
-	autostart "github.com/ProtonMail/go-autostart"
+	"regexp"
+	"strings"
 )
 
 var LocationName string
@@ -22,9 +23,9 @@ var autostartApp *autostart.App
 func CheckAutostart() bool {
 	myPath, _ := os.Executable()
 	autostartApp = &autostart.App{
-		Name: "clockstream",
+		Name:        "clockstream",
 		DisplayName: "Stream ProPresenter clocks to hillsonglabs",
-		Exec: []string{myPath},
+		Exec:        []string{myPath},
 	}
 
 	if autostartApp.IsEnabled() {
@@ -59,10 +60,10 @@ func SetAutostart(will_autostart bool) {
 }
 
 type Menu struct {
-	Connected bool
-	Version   string
-	LocationName   string
-	Autostart bool
+	Connected    bool
+	Version      string
+	LocationName string
+	Autostart    bool
 }
 
 // Render returns the HTML describing the status menu.
@@ -85,6 +86,7 @@ func (m *Menu) Render() string {
 	<menuitem separator></menuitem>
 	<menuitem label="Location: {{.LocationName}}" disabled></menuitem>
 	<menuitem label="Change..." onclick="OpenSettings"></menuitem>
+	<menuitem label="Edit Config File..." onclick="OpenTextedit"></menuitem>
 {{if .Autostart}}
 	<menuitem label="Start on boot" onclick="ToggleAutostart" checked=true></menuitem>
 {{else}}
@@ -149,6 +151,10 @@ func (m *Menu) OpenSettings() {
 		})
 	}
 }
+func (m *Menu) OpenTextedit() {
+	err := open.Run(fmt.Sprintf("%s/.clockstream", os.Getenv("HOME"))) //open.Run("~/.clockstream")
+	app.Logf("Command finished with error: %v", err)
+}
 
 type MenuClocks struct {
 	Clocks map[string]string
@@ -179,7 +185,7 @@ func (h *Help) Render() string {
 	h.Password = WS_PASSWORD
 	h.Port = WS_PORT
 	return `
-<div class="Help" style="color:#ddd; padding:30px;">
+<div class="Help" style="color:#555; padding:30px;">
 	<h3>Clockstream Setup Instructions</h3>
 	<p>
 		Open ProPresenter, go to Preferences, enable Network, set the Network
@@ -200,7 +206,7 @@ func (h *Help) Render() string {
 type Settings struct {
 	Location            string
 	LocationInitialized bool
-	Error bool
+	Error               bool
 }
 
 func (h *Settings) Render() string {
@@ -210,7 +216,7 @@ func (h *Settings) Render() string {
 		// TODO: How to initialize values? app.Import(&Settings{Location: LocationName})
 	}
 	return `
-<div class="Help" style="color:#ddd; padding:30px;">
+<div class="Help" style="color:#555; padding:30px;">
 	<h3>Clockstream Settings</h3>
 	<p>
 		Location Name<br>
@@ -251,7 +257,7 @@ func (h *Settings) OnUpdate() {
 
 type Config struct {
 	LocationName string `json:"location_name"`
-	InstallUuid string `json:"install_uuid"`
+	InstallUuid  string `json:"install_uuid"`
 }
 
 const CONFIG_PATH = "/.clockstream"
@@ -300,9 +306,12 @@ func WriteConfig() {
 
 func main() {
 	// app.EnableDebug(true)
+
+	WriteConfig()
+
 	LoadOrCreateConfig()
 	AutostartEnabled = CheckAutostart()
-	
+
 	if InstallUuid == "" {
 		// Upgrade v0.1 configs to v0.2
 		WriteConfig()
