@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"regexp"
+	"strings"
 	"fmt"
 	"github.com/dchest/uniuri"
 	"github.com/mitchellh/go-homedir"
@@ -12,15 +14,18 @@ import (
 )
 
 var LocationName string
+var InstallUuid string
 
 type Menu struct {
 	Connected bool
 	Version   string
+	LocationName   string
 }
 
 // Render returns the HTML describing the status menu.
 func (m *Menu) Render() string {
 	m.Version = VERSION
+	m.LocationName = LocationName
 	return `
 <menu>
 {{if .Connected}}
@@ -34,7 +39,8 @@ func (m *Menu) Render() string {
 	<menuitem separator></menuitem>
 {{end}}
 	<menuitem separator></menuitem>
-	<menuitem label="Set location name..." onclick="OpenSettings"></menuitem>
+	<menuitem label="Location: {{.LocationName}}" disabled></menuitem>
+	<menuitem label="Change..." onclick="OpenSettings"></menuitem>
 	<menuitem separator></menuitem>
 	<menuitem label="{{.Version}}" disabled></menuitem>
 	<menuitem separator></menuitem>
@@ -44,7 +50,7 @@ func (m *Menu) Render() string {
 }
 
 func (m *Menu) Subscribe() *app.EventSubscriber {
-	return app.NewEventSubscriber().Subscribe("connect-event", m.OnConnectEvent)
+	return app.NewEventSubscriber().Subscribe("connect-event", m.OnConnectEvent).Subscribe("refresh-event", m.OnConnectEvent)
 }
 
 func (m *Menu) OnConnectEvent(connected bool) {
@@ -72,7 +78,7 @@ func (m *Menu) OpenSettings() {
 		SettingsIsOpen = true
 		SettingsWindow = app.NewWindow(app.WindowConfig{
 			Width:          450,
-			Height:         250,
+			Height:         300,
 			X:              400,
 			Y:              600,
 			TitlebarHidden: true,
@@ -136,6 +142,7 @@ func (h *Help) Render() string {
 type Settings struct {
 	Location            string
 	LocationInitialized bool
+	Error bool
 }
 
 func (h *Settings) Render() string {
@@ -149,28 +156,44 @@ func (h *Settings) Render() string {
 	<h3>Clockstream Settings</h3>
 	<p>
 		Location Name<br>
-		<small>(alphanumeric, no spaces. Example: &quot;usa-east-nyc&quot;)</small>
 	</p>
 	<p>
-		<input value="{{.Location}}" placeholder="usa-east-(your-name)..." onchange="Location" autofocus style="font-size: 14pt; padding: 5px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+		<input value="{{.Location}}" style="font-family: mono;" placeholder="usa-east-(your-name)..." onchange="Location" autofocus style="font-size: 14pt; padding: 5px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+		<br><small>Must be lowercase with hyphens, no spaces. <br>Example: &quot;usa-east-nyc&quot;)</small>
 	</p>
+	{{if .Error}}
+	<p>Error: Invalid value. Ensure name is a lowercase alphanumeric with hyphens.</p>
+	{{end}}
 	<p>
-
 		<input type="submit" value="Update" style="font-size: 14pt; padding: 5px;" autocomplete="off" onclick="OnUpdate">
 	</p>
 </div>
 	`
 }
 
+func LowerDashify(str string) string {
+	var re = regexp.MustCompile(`[^a-zA-Z\d-]`)
+	return re.ReplaceAllString(strings.ToLower(str), "-")
+}
+
 func (h *Settings) OnUpdate() {
-	LocationName = h.Location
-	WriteConfig()
-	app.Log("Updated LocationName: ", LocationName)
-	SettingsWindow.Close()
+	lowerDashed := LowerDashify(h.Location)
+	if h.Location != lowerDashed {
+		h.Location = lowerDashed
+		h.Error = true
+		app.Render(h)
+	} else {
+		LocationName = lowerDashed
+		app.PostAction("refresh-action", true)
+		app.Log("Updated LocationName: ", LocationName)
+		WriteConfig()
+		SettingsWindow.Close()
+	}
 }
 
 type Config struct {
 	LocationName string `json:"location_name"`
+	InstallUuid string `json:"install_uuid"`
 }
 
 const CONFIG_PATH = "/.clockstream"
@@ -193,6 +216,7 @@ func LoadOrCreateConfig() {
 	jsonParser := json.NewDecoder(configFile)
 	jsonParser.Decode(&config)
 	LocationName = config.LocationName
+	InstallUuid = config.InstallUuid
 	if LocationName == "" {
 		WriteDefaultConfig()
 	}
@@ -201,11 +225,15 @@ func LoadOrCreateConfig() {
 func WriteDefaultConfig() {
 	generatedLocation := fmt.Sprintf("unknown-%s", uniuri.NewLenChars(5, []byte("abcdefghijklmnopqrstuvwxyz0123456789")))
 	LocationName = generatedLocation
+	InstallUuid = uniuri.NewLen(5)
 	WriteConfig()
 }
 
 func WriteConfig() {
-	defaultConfig := []byte(fmt.Sprintf(`{"location_name":"%s"}`, LocationName))
+	if InstallUuid == "" {
+		InstallUuid = uniuri.NewLen(5)
+	}
+	defaultConfig := []byte(fmt.Sprintf(`{"location_name":"%s", "install_uuid":"%s"}`, LocationName, InstallUuid))
 	err := ioutil.WriteFile(ConfigPath(), defaultConfig, 0644)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -213,9 +241,14 @@ func WriteConfig() {
 }
 
 func main() {
-	app.EnableDebug(true)
+	// app.EnableDebug(true)
 
 	LoadOrCreateConfig()
+	
+	if InstallUuid == "" {
+		// Upgrade v0.1 configs to v0.2
+		WriteConfig()
+	}
 
 	app.Log("LocationName: ", LocationName)
 
@@ -229,6 +262,9 @@ func main() {
 	})
 	app.HandleAction("clock-action", func(e app.EventDispatcher, a app.Action) {
 		e.Dispatch("clock-event", a.Arg)
+	})
+	app.HandleAction("refresh-action", func(e app.EventDispatcher, a app.Action) {
+		e.Dispatch("refresh-event", a.Arg)
 	})
 	app.Log(LocationName)
 

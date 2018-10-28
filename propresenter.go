@@ -29,13 +29,13 @@ func HandleMessage(str string) {
 	if message.Acn == "tmr" {
 		clocks[message.Uid] = message.Txt
 		app.PostAction("clock-action", clocks)
+		PushToFirebase(LocationClock{
+			UpdatedAt: time.Now(),
+			Location:  LocationName,
+			ClockUuid: message.Uid,
+			Value:     message.Txt,
+		})
 	}
-	PushToFirebase(LocationClock{
-		// InstallUuid: nil,
-		Location:  LocationName,
-		ClockUuid: message.Uid,
-		Value:     message.Txt,
-	})
 }
 
 var closeSocket chan bool

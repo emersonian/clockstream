@@ -12,7 +12,6 @@ import (
 
 type LocationClock struct {
 	Location    string
-	InstallUuid string
 	ClockUuid   string
 	Value       string
 	UpdatedAt   time.Time
@@ -53,16 +52,23 @@ func PushToFirebase(clock LocationClock) {
 
 	value := map[string]interface{}{
 		"value": clock.Value,
+		"updated_at": clock.UpdatedAt,
 	}
 
-	clockKey := fmt.Sprintf("locations/%s/%s", LocationName, clock.ClockUuid)
+	legacyClockKey := fmt.Sprintf("locations/%s/%s", LocationName, clock.ClockUuid)
+	if err := Client.NewRef(legacyClockKey).Update(ctx, value); err != nil {
+		app.Log(err)
+	}
+
+	// Also push to future location for clocks once I figure client side out
+	clockKey := fmt.Sprintf("locations/%s/clocks/%s", LocationName, clock.ClockUuid)
 	if err := Client.NewRef(clockKey).Update(ctx, value); err != nil {
 		app.Log(err)
 	}
 
 	locationKey := fmt.Sprintf("locations/%s", LocationName)
 	if err := Client.NewRef(locationKey).Update(ctx, map[string]interface{}{
-		"install_uuid": clock.InstallUuid,
+		"install_uuid": InstallUuid,
 		"updated_at":   time.Now(),
 	}); err != nil {
 		app.Log(err)
